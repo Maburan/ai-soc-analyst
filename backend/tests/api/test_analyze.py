@@ -46,7 +46,7 @@ def test_analyze_rejects_non_csv_extension(client):
     )
 
     assert response.status_code == 400
-    assert "CSV" in response.json()["detail"]
+    assert "CSV" in response.json()["detail"] or "auth log" in response.json()["detail"]
 
 
 def test_analyze_rejects_empty_file(client):

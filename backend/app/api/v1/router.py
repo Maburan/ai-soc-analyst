@@ -14,13 +14,19 @@ def health_check() -> HealthResponse:
 
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze_logs(
-    file: UploadFile = File(..., description="CSV security log file to analyze."),
+    file: UploadFile = File(..., description="CSV or Linux auth.log file to analyze."),
     analysis_service: AnalysisService = Depends(get_analysis_service),
 ) -> AnalyzeResponse:
-    if file.content_type not in {None, "application/octet-stream", "text/csv", "application/vnd.ms-excel"}:
+    if file.content_type not in {
+        None,
+        "application/octet-stream",
+        "text/csv",
+        "text/plain",
+        "application/vnd.ms-excel",
+    }:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid content type. Upload a CSV file.",
+            detail="Invalid content type. Upload a CSV or auth.log file.",
         )
 
     filename = file.filename or ""

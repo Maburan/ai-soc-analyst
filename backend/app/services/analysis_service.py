@@ -10,7 +10,9 @@ class AnalysisValidationError(ValueError):
 
 
 class AnalysisService:
-    """Runs the SOC workflow against uploaded CSV log files."""
+    """Runs the SOC workflow against uploaded security log files."""
+
+    SUPPORTED_EXTENSIONS = {".csv", ".log"}
 
     def __init__(self, runner: SOCWorkflowRunner) -> None:
         self.runner = runner
@@ -18,7 +20,7 @@ class AnalysisService:
     def analyze_upload(self, filename: str, file_content: bytes) -> AnalyzeResponse:
         self._validate_upload(filename, file_content)
 
-        temp_path = self._write_temp_csv(file_content)
+        temp_path = self._write_temp_log_file(filename, file_content)
         try:
             result = self.runner.run(temp_path)
         finally:
@@ -30,13 +32,17 @@ class AnalysisService:
         )
 
     def _validate_upload(self, filename: str, file_content: bytes) -> None:
-        if not filename.lower().endswith(".csv"):
-            raise AnalysisValidationError("Uploaded file must be a CSV (.csv).")
+        extension = Path(filename).suffix.lower()
+        if extension not in self.SUPPORTED_EXTENSIONS:
+            raise AnalysisValidationError(
+                "Uploaded file must be a CSV (.csv) or Linux auth log (.log)."
+            )
 
         if not file_content.strip():
-            raise AnalysisValidationError("Uploaded CSV file is empty.")
+            raise AnalysisValidationError("Uploaded log file is empty.")
 
-    def _write_temp_csv(self, file_content: bytes) -> str:
-        with NamedTemporaryFile(mode="wb", suffix=".csv", delete=False) as temp_file:
+    def _write_temp_log_file(self, filename: str, file_content: bytes) -> str:
+        extension = Path(filename).suffix.lower() or ".log"
+        with NamedTemporaryFile(mode="wb", suffix=extension, delete=False) as temp_file:
             temp_file.write(file_content)
             return temp_file.name
