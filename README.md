@@ -69,7 +69,7 @@ Detects suspicious activity patterns including:
             LogParserAgent    CorrelationAgent        InvestigationAgent      Report validation
             (CSV → events)    (events → findings)     (findings → reports)    (completeness check)
 ```
-![Mermaid Architecture Diagram](image.png)
+
 
 ### Agent responsibilities
 
