@@ -35,7 +35,8 @@ class AnalysisService:
         extension = Path(filename).suffix.lower()
         if extension not in self.SUPPORTED_EXTENSIONS:
             raise AnalysisValidationError(
-                "Uploaded file must be a CSV (.csv) or Linux auth log (.log)."
+                "Uploaded file must be a CSV (.csv) or log file (.log) "
+                "(CSV, Linux auth.log, or Windows Security log)."
             )
 
         if not file_content.strip():

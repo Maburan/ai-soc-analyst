@@ -7,15 +7,21 @@ from agents.log_parser_agent import LogParserAgent
 from agents.log_parsers import (
     CsvLogParser,
     LinuxAuthLogParser,
+    WindowsSecurityLogParser,
     detect_log_format,
     get_log_parser,
 )
-from agents.log_parsers.factory import CSV_FORMAT, LINUX_AUTH_FORMAT
+from agents.log_parsers.factory import (
+    CSV_FORMAT,
+    LINUX_AUTH_FORMAT,
+    WINDOWS_SECURITY_FORMAT,
+)
 from app.schemas.security_event import SecurityEvent
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 SAMPLE_CSV_FILE = PROJECT_ROOT / "data" / "sample_security_logs.csv"
 SAMPLE_AUTH_LOG_FILE = PROJECT_ROOT / "data" / "sample_auth.log"
+SAMPLE_WINDOWS_LOG_FILE = PROJECT_ROOT / "data" / "sample_windows_security.log"
 
 
 def test_detect_log_format_identifies_csv():
@@ -24,6 +30,82 @@ def test_detect_log_format_identifies_csv():
 
 def test_detect_log_format_identifies_linux_auth_log():
     assert detect_log_format(SAMPLE_AUTH_LOG_FILE) == LINUX_AUTH_FORMAT
+
+
+def test_detect_log_format_identifies_windows_security_log():
+    assert detect_log_format(SAMPLE_WINDOWS_LOG_FILE) == WINDOWS_SECURITY_FORMAT
+
+
+def test_detect_log_format_uses_windows_content_over_log_extension(tmp_path):
+    windows_content = "2026-06-01 10:01:00 | Event ID: 4625 | Account: admin | IP: 1.2.3.4\n"
+    misleading_file = tmp_path / "auth.log"
+    misleading_file.write_text(windows_content, encoding="utf-8")
+
+    assert detect_log_format(misleading_file) == WINDOWS_SECURITY_FORMAT
+
+
+def test_get_log_parser_returns_windows_security_parser():
+    parser = get_log_parser(SAMPLE_WINDOWS_LOG_FILE)
+    assert isinstance(parser, WindowsSecurityLogParser)
+
+
+def test_windows_security_log_parser_maps_event_ids():
+    parser = WindowsSecurityLogParser()
+
+    failed = parser._build_event("4625", "admin", "1.2.3.4", "2026-06-01 10:01:00", 1)
+    success = parser._build_event("4624", "admin", "1.2.3.4", "2026-06-01 10:01:50", 2)
+    privilege = parser._build_event("4672", "admin", "1.2.3.4", "2026-06-01 10:02:00", 3)
+
+    assert failed is not None and failed.event_type == "FAILED_LOGIN"
+    assert success is not None and success.event_type == "LOGIN_SUCCESS"
+    assert privilege is not None and privilege.event_type == "PRIVILEGE_GRANTED"
+
+
+def test_windows_security_log_parser_parses_compact_lines():
+    parser = WindowsSecurityLogParser()
+    events = parser.parse(SAMPLE_WINDOWS_LOG_FILE)
+
+    assert len(events) == 9
+    assert sum(event.event_type == "FAILED_LOGIN" for event in events) == 6
+    assert sum(event.event_type == "LOGIN_SUCCESS" for event in events) == 2
+    assert sum(event.event_type == "PRIVILEGE_GRANTED" for event in events) == 1
+
+
+def test_windows_security_log_parser_parses_event_viewer_block():
+    parser = WindowsSecurityLogParser()
+    block = """
+Log Name: Security
+Source: Microsoft-Windows-Security-Auditing
+Date: 6/1/2026 10:05:00 AM
+Event ID: 4672
+Account Name: alice
+Source Network Address: 192.168.0.20
+""".strip()
+
+    event = parser._parse_block(block, 1)
+
+    assert event is not None
+    assert event.event_type == "PRIVILEGE_GRANTED"
+    assert event.user == "alice"
+    assert event.ip == "192.168.0.20"
+    assert event.timestamp == datetime(2026, 6, 1, 10, 5, 0)
+
+
+def test_windows_security_log_parser_uses_fallback_timestamp_when_missing():
+    parser = WindowsSecurityLogParser(default_timestamp=datetime(2026, 1, 1, 0, 0, 0))
+    block = "Event ID: 4625\nAccount Name: admin\nSource Network Address: 1.2.3.4"
+
+    event = parser._parse_block(block, 3)
+
+    assert event is not None
+    assert event.timestamp.second == 3
+
+
+def test_log_parser_agent_auto_detects_windows_security_log():
+    events = LogParserAgent().parse_file(SAMPLE_WINDOWS_LOG_FILE)
+
+    assert len(events) == 9
+    assert any(event.event_type == "PRIVILEGE_GRANTED" for event in events)
 
 
 def test_detect_log_format_uses_content_over_extension(tmp_path):
