@@ -4,6 +4,8 @@ import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAnalysis } from "../context/AnalysisContext";
 import { analyzeLogFile } from "../services/api";
 
+const SUPPORTED_EXTENSIONS = [".csv", ".log"];
+
 export function UploadLogsPage() {
   const navigate = useNavigate();
   const { setAnalysisResult, setUploadedFileName } = useAnalysis();
@@ -21,12 +23,13 @@ export function UploadLogsPage() {
     event.preventDefault();
 
     if (!selectedFile) {
-      setError("Please select a CSV log file to analyze.");
+      setError("Please select a log file to analyze.");
       return;
     }
 
-    if (!selectedFile.name.toLowerCase().endsWith(".csv")) {
-      setError("Only CSV files are supported.");
+    const fileName = selectedFile.name.toLowerCase();
+    if (!SUPPORTED_EXTENSIONS.some((ext) => fileName.endsWith(ext))) {
+      setError("Only CSV (.csv) and Linux auth log (.log) files are supported.");
       return;
     }
 
@@ -54,9 +57,9 @@ export function UploadLogsPage() {
       <section className="rounded-xl border border-slate-200 bg-white p-6">
         <h2 className="text-2xl font-semibold text-slate-900">Upload Logs</h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-          Upload a CSV security log file to run automated correlation and incident
-          investigation. The workflow will parse events, detect suspicious activity,
-          and generate investigation reports.
+          Upload a CSV security log or Linux auth.log file to run automated
+          correlation and incident investigation. The workflow will parse events,
+          detect suspicious activity, and generate investigation reports.
         </p>
       </section>
 
@@ -68,10 +71,10 @@ export function UploadLogsPage() {
           className="rounded-xl border border-dashed border-slate-300 bg-white p-8"
         >
           <label className="block text-sm font-medium text-slate-700">
-            CSV Log File
+            Log File (CSV or auth.log)
             <input
               type="file"
-              accept=".csv,text/csv"
+              accept=".csv,text/csv,.log,text/plain"
               onChange={handleFileChange}
               className="mt-3 block w-full cursor-pointer rounded-md border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-slate-800"
             />
