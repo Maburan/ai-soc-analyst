@@ -116,16 +116,13 @@ ai-soc-analyst/
 > Add screenshots to a `docs/screenshots/` folder and update the paths below.
 
 ### Upload Logs
-<!-- ![Upload Logs](docs/screenshots/upload-logs.png) -->
-*Upload page — select a CSV file and run SOC analysis.*
+![upload-logs](image-1.png)
 
 ### Analysis Results — Findings
-<!-- ![Findings Table](docs/screenshots/findings-table.png) -->
-*Findings table showing detected threats with severity, user, and source IP.*
+![analysis results - findings](image-2.png)
 
 ### Analysis Results — Investigation Reports
-<!-- ![Investigation Reports](docs/screenshots/investigation-reports.png) -->
-*Investigation report cards with summary, evidence, and recommendations.*
+![analysis results - investigation reports](image-3.png)
 
 ---
 
