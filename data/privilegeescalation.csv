@@ -1,0 +1,3 @@
+timestamp,event_type,user,ip
+2026-06-01 10:01:00,LOGIN_SUCCESS,john,10.0.0.1
+2026-06-01 10:02:00,PRIVILEGE_GRANTED,john,10.0.0.1
