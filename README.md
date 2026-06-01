@@ -113,7 +113,6 @@ ai-soc-analyst/
 
 ## Screenshots
 
-> Add screenshots to a `docs/screenshots/` folder and update the paths below.
 
 ### Upload Logs
 ![upload-logs](image-1.png)
