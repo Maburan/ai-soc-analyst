@@ -69,7 +69,7 @@ Detects suspicious activity patterns including:
             LogParserAgent    CorrelationAgent        InvestigationAgent      Report validation
             (CSV → events)    (events → findings)     (findings → reports)    (completeness check)
 ```
-
+![Mermaid Architecture Diagram](image.png)
 
 ### Agent responsibilities
 
@@ -115,13 +115,13 @@ ai-soc-analyst/
 
 
 ### Upload Logs
-![upload-logs](image-1.png)
+![upload-logs](screenshots/image-1.png)
 
 ### Analysis Results — Findings
-![analysis results - findings](image-2.png)
+![analysis results - findings](screenshots/image-2.png)
 
 ### Analysis Results — Investigation Reports
-![analysis results - investigation reports](image-3.png)
+![analysis results - investigation reports](screenshots/image-3.png)
 
 ---
 
