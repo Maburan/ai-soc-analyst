@@ -4,6 +4,7 @@ from app.schemas.security_finding import SecurityFinding
 BRUTE_FORCE_ATTACK = "Brute Force Attack"
 PRIVILEGE_ESCALATION = "Privilege Escalation"
 DATA_EXFILTRATION = "Data Exfiltration"
+PASSWORD_SPRAYING_ATTACK = "Password Spraying Attack"
 
 
 def build_brute_force_report(finding: SecurityFinding) -> InvestigationReport:
@@ -82,10 +83,39 @@ def build_data_exfiltration_report(finding: SecurityFinding) -> InvestigationRep
     )
 
 
+def build_password_spraying_report(finding: SecurityFinding) -> InvestigationReport:
+    return InvestigationReport(
+        incident_title=get_incident_title(finding),
+        severity=get_incident_severity(finding),
+        summary=(
+            f"A password spraying attack was detected from IP address "
+            f"{finding.source_ip}, targeting multiple user accounts. "
+            f"Multiple failed login attempts across different usernames suggest "
+            f"a coordinated password guessing attempt. MITRE ATT&CK: T1110.003."
+        ),
+        evidence=[
+            finding.description,
+            f"Affected users: Multiple Users",
+            f"Source IP: {finding.source_ip}",
+            f"Finding severity: {finding.severity}",
+            f"MITRE ATT&CK: T1110.003 - Password Spraying",
+        ],
+        recommendations=[
+            "Enforce account lockout policies after a threshold of failed attempts.",
+            "Implement rate-limiting on authentication endpoints from a single IP.",
+            "Enable multi-factor authentication (MFA) for all user accounts.",
+            "Monitor for additional failed login attempts from the same source IP.",
+            "Review authentication logs to identify any accounts that may have been compromised.",
+            "Block or blacklist the source IP at the network perimeter.",
+        ],
+    )
+
+
 REPORT_BUILDERS = {
     BRUTE_FORCE_ATTACK: build_brute_force_report,
     PRIVILEGE_ESCALATION: build_privilege_escalation_report,
     DATA_EXFILTRATION: build_data_exfiltration_report,
+    PASSWORD_SPRAYING_ATTACK: build_password_spraying_report,
 }
 
 INCIDENT_TITLE_BUILDERS = {
@@ -97,6 +127,9 @@ INCIDENT_TITLE_BUILDERS = {
     ),
     DATA_EXFILTRATION: lambda finding: (
         f"Possible Data Exfiltration by {finding.affected_user}"
+    ),
+    PASSWORD_SPRAYING_ATTACK: lambda finding: (
+        f"Password Spraying Attack from {finding.source_ip}"
     ),
 }
 

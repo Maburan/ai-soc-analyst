@@ -6,6 +6,7 @@ from agents.report_generators.template_report_generator import TemplateReportGen
 from agents.report_generators.templates import (
     BRUTE_FORCE_ATTACK,
     DATA_EXFILTRATION,
+    PASSWORD_SPRAYING_ATTACK,
     PRIVILEGE_ESCALATION,
 )
 from app.schemas.investigation_report import InvestigationReport
@@ -82,19 +83,43 @@ def test_data_exfiltration_report_has_expected_fields():
     assert "Identify which files were accessed and downloaded." in report.recommendations
 
 
+def test_password_spraying_report_has_expected_fields():
+    finding = make_finding(
+        finding_type=PASSWORD_SPRAYING_ATTACK,
+        description="6 failed login attempts targeting 6 unique users from IP 198.51.100.20.",
+        source_ip="198.51.100.20",
+    )
+
+    report = InvestigationAgent().investigate_one(finding)
+
+    assert isinstance(report, InvestigationReport)
+    assert report.incident_title == "Password Spraying Attack from 198.51.100.20"
+    assert report.severity == "HIGH"
+    assert "password spraying" in report.summary.lower()
+    assert "T1110.003" in report.summary
+    assert finding.description in report.evidence
+    assert "Affected users: Multiple Users" in report.evidence
+    assert "Source IP: 198.51.100.20" in report.evidence
+    assert "MITRE ATT&CK: T1110.003 - Password Spraying" in report.evidence
+    assert "Enforce account lockout policies after a threshold of failed attempts." in report.recommendations
+    assert "Enable multi-factor authentication (MFA) for all user accounts." in report.recommendations
+
+
 def test_investigate_processes_multiple_findings():
     findings = [
         make_finding(BRUTE_FORCE_ATTACK, affected_user="admin"),
         make_finding(PRIVILEGE_ESCALATION, severity="CRITICAL", affected_user="alice"),
         make_finding(DATA_EXFILTRATION, affected_user="carol"),
+        make_finding(PASSWORD_SPRAYING_ATTACK, affected_user="Multiple Users", source_ip="10.0.0.99"),
     ]
 
     reports = InvestigationAgent().investigate(findings)
 
-    assert len(reports) == 3
+    assert len(reports) == 4
     assert reports[0].incident_title.startswith("Brute Force Attack")
     assert reports[1].incident_title.startswith("Privilege Escalation")
     assert reports[2].incident_title.startswith("Possible Data Exfiltration")
+    assert reports[3].incident_title.startswith("Password Spraying Attack")
 
 
 def test_unknown_finding_type_raises_error():
