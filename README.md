@@ -276,9 +276,15 @@ npm run preview
 
 ![Input box](screenshots/input-box.png)
 
+### Windows Logs
+
 ![Windows logs](screenshots/windows-logs.png)
 
+### Linux Logs
+
 ![Linux logs](screenshots/linux-logs.png)
+
+### CSV Logs
 
 ![CSV logs](screenshots/csv-logs.png)
 
