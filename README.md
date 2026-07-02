@@ -273,13 +273,20 @@ npm run preview
 ## Screenshots
 
 ### Upload Logs
-![Upload page with supported formats grid and file upload form](screenshots/image-1.png)
+
+![Input box](screenshots/input-box.png)
+
+![Windows logs](screenshots/window-logs.png)
+
+![Linux logs](screenshots/linux-logs.png)
+
+![CSV logs](screenshots/csv-logs.png)
 
 ### Analysis Results — Findings
-![Security findings table with severity-coded badges and icons](screenshots/image-2.png)
+![Security Findings](screenshots/security-findings.png)
 
 ### Analysis Results — Investigation Reports
-![Investigation report cards with evidence and recommendations](screenshots/image-3.png)
+![Investigation Reports](screenshots/investigation-report.png)
 
 ---
 
@@ -418,3 +425,7 @@ npm run build          # TypeScript type check + production build
 ## License
 
 This project is provided for educational and demonstration purposes.
+
+## 🌐 Live Demo
+
+Coming soon (Vercel + Render)
