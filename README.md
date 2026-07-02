@@ -1,131 +1,204 @@
 # AI SOC Analyst
 
-An AI-assisted Security Operations Center (SOC) analyst that ingests CSV security logs, detects suspicious activity through rule-based correlation, and produces structured incident investigation reports.
+AI SOC Analyst automates the early stages of security log investigation. Upload a log file, and the system parses events, correlates suspicious activity through modular detection rules, and produces structured incident investigation reports — all through a web interface.
 
-Upload a log file, run analysis, and review findings and reports through a simple web interface — no authentication or account management required.
+The backend is a FastAPI application that orchestrates a [LangGraph](https://langchain-ai.github.io/langgraph/) workflow of specialized SOC agents. The frontend is a React single-page application with file upload and results visualization.
 
----
-
-## Overview
-
-AI SOC Analyst automates the early stages of security log investigation. It parses authentication and access events, correlates patterns such as brute force attacks and privilege escalation, and generates analyst-ready investigation reports.
-
-The system is built as a modular pipeline of specialized agents orchestrated by a LangGraph workflow, exposed through a FastAPI backend and a React frontend.
-
-**Core workflow:** Upload CSV logs → Parse events → Correlate findings → Investigate → Generate reports
+No authentication, database, or external dependencies are required to run the core analysis. Report generation defaults to deterministic templates, with an optional upgrade to Google Gemini for AI-written summaries, evidence, and recommendations.
 
 ---
 
-## Features
+## Key Features
 
-### Log ingestion and parsing
-- Upload CSV security logs via web UI or REST API
-- Validates log format (`timestamp`, `event_type`, `user`, `ip`)
-- Converts raw rows into typed `SecurityEvent` objects
-
-### Threat correlation (rule-based)
-Detects suspicious activity patterns including:
-
-| Detection | Rule |
-|-----------|------|
-| **Brute Force Attack** | 5+ `FAILED_LOGIN` events followed by `LOGIN_SUCCESS` (same user and IP) |
-| **Privilege Escalation** | `LOGIN_SUCCESS` followed by `PRIVILEGE_GRANTED` (same user) |
-| **Data Exfiltration** | `LOGIN_SUCCESS` → multiple `FILE_ACCESS` → `LARGE_DOWNLOAD` |
-
-### Investigation reports
-- Template-based report generation by default
-- Optional Gemini-powered summaries, evidence, and recommendations
-- Automatic fallback to templates if the Gemini API is unavailable
-
-### LangGraph orchestration
-- End-to-end workflow with four pipeline stages
-- Shared state passed between nodes
-- Injectable agents for testing and extension
-
-### Web interface
-- Upload page with loading states and error handling
-- Results page with findings table and investigation report cards
-- Severity color coding for quick triage
+- **Multi-format log parsing** — CSV, Linux auth.log, and Windows Security event logs
+- **Parser factory with auto-detection** — the system detects the log format from file content and selects the correct parser; no manual format selection needed
+- **Four detection rules** — Brute Force, Password Spraying, Privilege Escalation, and Data Exfiltration
+- **Modular rule architecture** — rules are independent classes implementing a common `DetectionRule` interface, making them simple to add, remove, or parameterize
+- **LangGraph workflow** — a four-stage directed graph (`parse_logs → correlate_events → investigate_findings → generate_reports`) with typed shared state
+- **Template-based report generation** — every finding type has a deterministic report template with incident title, summary, evidence, and remediation recommendations
+- **Optional Gemini AI reports** — when a `GEMINI_API_KEY` is configured, the investigation agent generates reports using `gemini-2.0-flash`, with automatic fallback to templates on any failure
+- **Web UI** — upload page with drag-and-drop, toast notifications, severity-coded findings table, and investigation report cards
+- **REST API** — `GET /health` and `POST /analyze` endpoints with multipart file upload
 
 ---
 
-## Architecture
+## Supported Log Formats
+
+| Format | Event Types | Example |
+|--------|-------------|---------|
+| **CSV** | `FAILED_LOGIN`, `LOGIN_SUCCESS`, `PRIVILEGE_GRANTED`, `FILE_ACCESS`, `LARGE_DOWNLOAD` | Columns: `timestamp`, `event_type`, `user`, `ip` |
+| **Linux auth.log** | `FAILED_LOGIN` (sshd), `LOGIN_SUCCESS` (sshd) | Syslog entries matching `Accepted/Failed password for <user> from <IP>` |
+| **Windows Security Log** | `FAILED_LOGIN` (Event ID 4625), `LOGIN_SUCCESS` (4624), `PRIVILEGE_GRANTED` (4672) | Pipe-delimited compact format or multiline Event Viewer blocks |
+
+The log parser factory samples the first lines of a file and uses content-based heuristics to detect the format before falling back to file extension.
+
+---
+
+## Detection Rules
+
+| Rule | Pattern | Severity |
+|------|---------|----------|
+| **Brute Force Attack** | 5+ `FAILED_LOGIN` events followed by `LOGIN_SUCCESS` for the same user and IP | `HIGH` |
+| **Password Spraying Attack** | 5+ unique user accounts targeted with `FAILED_LOGIN` from the same IP within 5 minutes (MITRE ATT&CK T1110.003) | `HIGH` |
+| **Privilege Escalation** | `LOGIN_SUCCESS` immediately followed by `PRIVILEGE_GRANTED` for the same user | `CRITICAL` |
+| **Data Exfiltration** | `LOGIN_SUCCESS` → 2+ `FILE_ACCESS` events → `LARGE_DOWNLOAD` for the same user | `HIGH` |
+
+All rules live in `backend/agents/rules/` and extend the abstract `DetectionRule` class. The `CorrelationAgent` runs every registered rule against the sorted event stream and collects matching findings.
+
+---
+
+## Architecture Overview
 
 ```
 ┌─────────────────┐     POST /analyze      ┌──────────────────────────────────────┐
-│  React Frontend │ ─────────────────────► │           FastAPI Backend           │
-│  (Vite + TS)    │ ◄───────────────────── │                                      │
+│  React Frontend │ ──────────────────────► │           FastAPI Backend           │
+│  (Vite + TS)    │ ◄────────────────────── │                                      │
 └─────────────────┘   findings + reports   │  AnalysisService → SOCWorkflowRunner │
-                                           └──────────────────┬───────────────────┘
-                                                              │
-                              ┌───────────────────────────────▼───────────────────────────────┐
-                              │                    LangGraph Workflow                        │
-                              │                                                               │
-                              │  Parse Logs → Correlate Events → Investigate → Gen Reports   │
-                              └───────────────────────────────┬───────────────────────────────┘
-                                                              │
-                    ┌─────────────────┬───────────────────────┼───────────────────────┐
-                    ▼                 ▼                       ▼                       ▼
-            LogParserAgent    CorrelationAgent        InvestigationAgent      Report validation
-            (CSV → events)    (events → findings)     (findings → reports)    (completeness check)
+                                            └──────────────────┬───────────────────┘
+                                                               │
+                               ┌───────────────────────────────▼───────────────────────────────┐
+                               │                    LangGraph Workflow                        │
+                               │                                                               │
+                               │  parse_logs → correlate_events → investigate → gen_reports   │
+                               └───────────────────────┬───────────────────────────────────────┘
+                                                       │
+                     ┌─────────────────────────────────┼─────────────────────────────────┐
+                     ▼                                 ▼                                 ▼
+             LogParserAgent                    CorrelationAgent                  InvestigationAgent
+         (factory → parser instance)        (modular DetectionRules)       (TemplateReportGenerator
+                                                                             or GeminiReportGenerator)
 ```
 
+### LangGraph Workflow
 
-### Agent responsibilities
+The workflow is a [`StateGraph`](https://langchain-ai.github.io/langgraph/concepts/high_level/) with four sequential nodes:
 
-| Agent | Input | Output |
-|-------|-------|--------|
-| `LogParserAgent` | CSV file path | `list[SecurityEvent]` |
-| `CorrelationAgent` | `list[SecurityEvent]` | `list[SecurityFinding]` |
-| `InvestigationAgent` | `list[SecurityFinding]` | `list[InvestigationReport]` |
+1. **parse_logs** — The `LogParserAgent` delegates to the parser factory, which auto-detects the format and returns typed `SecurityEvent` objects.
+2. **correlate_events** — The `CorrelationAgent` runs the event stream through every registered `DetectionRule` and collects `SecurityFinding` objects.
+3. **investigate_findings** — The `InvestigationAgent` converts each finding into an `InvestigationReport` using the configured report generator.
+4. **generate_reports** — A validation node that checks report count against finding count and verifies required fields before passing results to the API.
 
-### Report generators
+Shared state is typed as `SOCWorkflowState` (a `TypedDict` with `log_file_path`, `security_events`, `security_findings`, and `investigation_reports`).
 
-`InvestigationAgent` accepts any `ReportGenerator` implementation:
+### Dependency Injection
 
-- **`TemplateReportGenerator`** — deterministic, rule-based reports (default)
-- **`GeminiReportGenerator`** — AI-generated summaries with template fallback
+All agents accept optional constructor arguments, making them easy to swap for testing:
 
-### Project structure
+```python
+# Default (template reports)
+runner = SOCWorkflowRunner()
+
+# With Gemini AI
+from agents.investigation_agent import InvestigationAgent
+from agents.report_generators import GeminiReportGenerator
+runner = SOCWorkflowRunner(
+    investigation_agent=InvestigationAgent(
+        report_generator=GeminiReportGenerator()
+    )
+)
+```
+
+---
+
+## Tech Stack
+
+### Backend
+
+| Technology | Purpose |
+|------------|---------|
+| Python 3.13 | Runtime |
+| FastAPI | REST API framework |
+| Pydantic v2 | Data validation and schemas |
+| LangGraph | Agent workflow orchestration |
+| Google Generative AI | Optional Gemini report generation |
+| pytest | Unit and integration testing |
+
+### Frontend
+
+| Technology | Purpose |
+|------------|---------|
+| React 18 | UI framework |
+| TypeScript | Type-safe JavaScript |
+| Vite | Build tool and dev server |
+| Tailwind CSS | Utility-first styling |
+| React Router v6 | Client-side routing |
+
+---
+
+## Project Structure
 
 ```
 ai-soc-analyst/
 ├── backend/
-│   ├── app/                    # FastAPI application
-│   │   ├── api/                # Routes and dependency injection
-│   │   ├── schemas/            # Pydantic models
-│   │   └── services/           # Business logic
+│   ├── app/                          # FastAPI application
+│   │   ├── main.py                   # App factory, CORS, router registration
+│   │   ├── api/
+│   │   │   ├── deps.py               # Dependency injection (workflow runner, service)
+│   │   │   └── v1/router.py          # GET /health, POST /analyze
+│   │   ├── schemas/                  # Pydantic models
+│   │   │   ├── analyze.py            # AnalyzeResponse, HealthResponse
+│   │   │   ├── security_event.py     # SecurityEvent
+│   │   │   ├── security_finding.py   # SecurityFinding
+│   │   │   └── investigation_report.py
+│   │   └── services/
+│   │       └── analysis_service.py   # Validation, temp file, workflow invocation
 │   ├── agents/
-│   │   ├── graphs/             # LangGraph workflow
-│   │   ├── rules/              # Correlation detection rules
-│   │   └── report_generators/  # Template and Gemini report generators
+│   │   ├── graphs/                   # LangGraph workflow
+│   │   │   ├── state.py              # SOCWorkflowState TypedDict
+│   │   │   ├── nodes.py              # Node functions
+│   │   │   ├── workflow.py           # StateGraph builder
+│   │   │   └── runner.py             # SOCWorkflowRunner
+│   │   ├── log_parsers/              # Parser interfaces and implementations
+│   │   │   ├── base.py               # LogParser ABC
+│   │   │   ├── factory.py            # Auto-detect + get_log_parser()
+│   │   │   ├── csv_log_parser.py
+│   │   │   ├── linux_auth_log_parser.py
+│   │   │   └── windows_security_log_parser.py
+│   │   ├── rules/                    # Detection rules (pluggable)
+│   │   │   ├── base.py               # DetectionRule ABC
+│   │   │   ├── brute_force.py
+│   │   │   ├── password_spraying.py  # Configurable threshold + time window
+│   │   │   ├── privilege_escalation.py
+│   │   │   └── data_exfiltration.py
+│   │   ├── report_generators/        # Report generation
+│   │   │   ├── base.py               # ReportGenerator ABC
+│   │   │   ├── template_report_generator.py
+│   │   │   ├── templates.py          # Report content builders
+│   │   │   ├── gemini_report_generator.py  # Optional Gemini with template fallback
+│   │   │   └── gemini_client.py      # API client, prompt builder, Pydantic response
+│   │   ├── log_parser_agent.py
+│   │   ├── correlation_agent.py
+│   │   └── investigation_agent.py
 │   └── tests/
+│       ├── api/
+│       │   ├── conftest.py
+│       │   ├── test_health.py
+│       │   ├── test_analyze.py
+│       │   ├── test_analyze_auth_log.py
+│       │   └── test_analyze_windows_log.py
+│       └── agents/
+│           └── test_soc_workflow.py
 ├── frontend/
-│   └── src/
-│       ├── pages/              # Upload Logs, Analysis Results
-│       ├── components/         # FindingsTable, ReportCard, etc.
-│       └── services/           # API client
-└── data/
-    └── sample_security_logs.csv
+│   ├── src/
+│   │   ├── pages/                    # UploadLogsPage, AnalysisResultsPage
+│   │   ├── components/               # Layout, FindingsTable, ReportCard, ToastContainer
+│   │   ├── context/                  # AnalysisContext, ToastContext
+│   │   ├── services/api.ts           # API client (analyzeLogFile)
+│   │   └── types/api.ts              # TypeScript interfaces
+│   ├── App.tsx                       # Root component with routing + providers
+│   ├── main.tsx                      # Entry point
+│   └── index.css                     # Tailwind directives
+├── data/
+│   └── samples/                      # Attack datasets across all formats
+│       ├── csv/
+│       ├── linux/
+│       └── windows/
+└── screenshots/
 ```
 
 ---
 
-## Screenshots
-
-
-### Upload Logs
-![upload-logs](screenshots/image-1.png)
-
-### Analysis Results — Findings
-![analysis results - findings](screenshots/image-2.png)
-
-### Analysis Results — Investigation Reports
-![analysis results - investigation reports](screenshots/image-3.png)
-
----
-
-## Setup
+## Installation and Local Setup
 
 ### Prerequisites
 
@@ -133,14 +206,14 @@ ai-soc-analyst/
 - Node.js 18+
 - (Optional) Google Gemini API key for AI-generated reports
 
-### 1. Clone the repository
+### 1. Clone
 
 ```bash
 git clone <repository-url>
 cd ai-soc-analyst
 ```
 
-### 2. Backend setup
+### 2. Backend
 
 ```bash
 cd backend
@@ -168,11 +241,9 @@ Start the API server:
 uvicorn app.main:app --reload
 ```
 
-The API will be available at `http://127.0.0.1:8000`.
+The API is available at `http://127.0.0.1:8000`. Interactive API docs at `http://127.0.0.1:8000/docs`.
 
-Interactive API docs: `http://127.0.0.1:8000/docs`
-
-### 3. Frontend setup
+### 3. Frontend
 
 In a separate terminal:
 
@@ -182,9 +253,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173` in your browser.
-
-The Vite dev server proxies `/analyze` and `/health` to the backend automatically.
+Open `http://localhost:5173` in your browser. The Vite dev server proxies `/analyze` and `/health` to the backend automatically.
 
 For production builds, set the API URL in `frontend/.env`:
 
@@ -199,74 +268,92 @@ npm run build
 npm run preview
 ```
 
-### 4. Sample log file
+---
 
-A sample CSV is included at `data/sample_security_logs.csv`:
+## Screenshots
 
-```csv
-timestamp,event_type,user,ip
-2026-06-01 10:01:00,FAILED_LOGIN,admin,1.2.3.4
-2026-06-01 10:02:00,FAILED_LOGIN,admin,1.2.3.4
-2026-06-01 10:03:00,LOGIN_SUCCESS,admin,1.2.3.4
+### Upload Logs
+![Upload page with supported formats grid and file upload form](screenshots/image-1.png)
+
+### Analysis Results — Findings
+![Security findings table with severity-coded badges and icons](screenshots/image-2.png)
+
+### Analysis Results — Investigation Reports
+![Investigation report cards with evidence and recommendations](screenshots/image-3.png)
+
+---
+
+## Sample Datasets
+
+The `data/samples/` directory contains labeled attack scenarios across all three supported formats. Each file documents its attack type, timeline, expected findings, and which detection rules should trigger.
+
+| File | Format | Attack | Rules Triggered |
+|------|--------|--------|-----------------|
+| `csv/brute_force.csv` | CSV | Brute Force | BruteForceRule |
+| `csv/password_spraying.csv` | CSV | Password Spraying | PasswordSprayingRule |
+| `csv/privilege_escalation.csv` | CSV | Privilege Escalation | PrivilegeEscalationRule |
+| `csv/data_exfiltration.csv` | CSV | Data Exfiltration | DataExfiltrationRule |
+| `csv/mixed_attack.csv` | CSV | Multi-stage (all 4 attacks) | All four rules |
+| `linux/brute_force.log` | Linux auth.log | Brute Force via SSH | BruteForceRule |
+| `linux/password_spraying.log` | Linux auth.log | Password Spraying via SSH | PasswordSprayingRule |
+| `windows/brute_force.log` | Windows Security | Brute Force via RDP | BruteForceRule |
+| `windows/password_spraying.log` | Windows Security | Password Spraying | PasswordSprayingRule |
+| `windows/privilege_escalation.log` | Windows Security | Privilege Escalation | PrivilegeEscalationRule |
+| `windows/post_bruteforce_escalation.log` | Windows Security | Brute Force → Escalation chain | BruteForceRule + PrivilegeEscalationRule |
+
+See `data/samples/README.md` for detailed timelines and expected output.
+
+### Quick test with curl
+
+```bash
+curl -X POST http://127.0.0.1:8000/analyze \
+  -F "file=@data/samples/csv/brute_force.csv"
 ```
 
 ---
 
-## API documentation
+## API Reference
 
 ### `GET /health`
 
-Check service status.
+Returns service status.
 
 **Response `200 OK`**
-
 ```json
 {
   "status": "ok"
 }
 ```
 
----
-
 ### `POST /analyze`
 
-Analyze an uploaded CSV security log file.
+Analyze an uploaded log file.
 
 **Request**
-
 - Content-Type: `multipart/form-data`
-- Body: `file` — CSV file with columns `timestamp`, `event_type`, `user`, `ip`
-
-**Example (curl)**
-
-```bash
-curl -X POST http://127.0.0.1:8000/analyze \
-  -F "file=@data/sample_security_logs.csv"
-```
+- Body: `file` — a CSV, Linux auth.log, or Windows Security log file
 
 **Response `200 OK`**
-
 ```json
 {
   "findings": [
     {
       "finding_type": "Brute Force Attack",
       "severity": "HIGH",
-      "description": "5 failed login attempts followed by a successful login for user 'admin' from IP 1.2.3.4.",
-      "affected_user": "admin",
-      "source_ip": "1.2.3.4"
+      "description": "5 failed login attempts followed by a successful login for user 'svc_app' from IP 203.0.113.50.",
+      "affected_user": "svc_app",
+      "source_ip": "203.0.113.50"
     }
   ],
   "investigation_reports": [
     {
-      "incident_title": "Brute Force Attack Targeting admin",
+      "incident_title": "Brute Force Attack Targeting svc_app",
       "severity": "HIGH",
-      "summary": "A brute force attack was detected against user 'admin'...",
+      "summary": "A brute force attack was detected against user 'svc_app'...",
       "evidence": [
-        "5 failed login attempts followed by a successful login...",
-        "Affected user: admin",
-        "Source IP: 1.2.3.4",
-        "Finding severity: HIGH"
+        "5 failed login attempts followed by a successful login",
+        "Affected user: svc_app",
+        "Source IP: 203.0.113.50"
       ],
       "recommendations": [
         "Reset the affected user's password immediately.",
@@ -282,36 +369,13 @@ curl -X POST http://127.0.0.1:8000/analyze \
 
 | Status | Cause |
 |--------|-------|
-| `400` | Invalid file type, empty file, or bad content type |
+| `400` | Invalid file type, empty file, or unsupported content type |
 | `422` | Invalid CSV structure or missing required columns |
 | `500` | Unexpected server error |
 
 ---
 
-## Tech stack
-
-### Backend
-| Technology | Purpose |
-|------------|---------|
-| Python 3.13 | Runtime |
-| FastAPI | REST API framework |
-| Pydantic | Data validation and schemas |
-| LangGraph | Agent workflow orchestration |
-| Google Generative AI | Optional Gemini report generation |
-| pytest | Unit and integration testing |
-
-### Frontend
-| Technology | Purpose |
-|------------|---------|
-| React 18 | UI framework |
-| TypeScript | Type-safe JavaScript |
-| Vite | Build tool and dev server |
-| Tailwind CSS | Utility-first styling |
-| React Router | Client-side routing |
-
----
-
-## Running tests
+## Testing
 
 ### Backend
 
@@ -320,33 +384,34 @@ cd backend
 python -m pytest -v
 ```
 
-Run specific test suites:
-
-```bash
-python -m pytest tests/agents/ -v      # Agent and workflow tests
-python -m pytest tests/api/ -v        # API endpoint tests
-```
+The test suite covers:
+- API endpoint behavior (health, analysis, validation, error handling)
+- All four detection rules with controlled event sequences
+- Log parser edge cases (empty files, missing columns, unsupported formats)
+- LangGraph node functions in isolation
+- Full workflow integration (end-to-end graph invocation)
+- Agent dependency injection
+- Optional Gemini report generator with mock client
 
 ### Frontend
 
 ```bash
 cd frontend
-npm run build    # TypeScript check + production build
+npm run build          # TypeScript type check + production build
 ```
 
 ---
 
-## Future enhancements
+## Future Roadmap
 
-- **Threat intelligence integration** — enrich findings with IP reputation and IOC lookups
-- **SQLite persistence** — store events, findings, and reports for historical analysis
-- **Real-time log streaming** — ingest logs via syslog or webhook instead of file upload only
-- **Additional correlation rules** — lateral movement, impossible travel, anomalous file access
-- **Analyst feedback loop** — mark findings as true/false positive to improve detection
-- **Export and ticketing** — PDF report export and integration with Jira or ServiceNow
+- **Threat intelligence enrichment** — IP reputation lookups and IOC matching
+- **Additional detection rules** — lateral movement, impossible travel, anomalous file access, ransomware patterns
+- **Report export** — PDF/JSON export of findings and investigation reports
+- **Analysis history** — store past results for review and comparison
+- **Analyst feedback loop** — mark findings as true/false positive to tune detections
 - **Authentication and RBAC** — multi-user access with role-based permissions
-- **Dashboard and metrics** — trend charts, MTTR tracking, and alert volume over time
-- **Hybrid AI pipeline** — combine Gemini summaries with structured template fields per finding type
+- **Dashboard and metrics** — trend charts, alert volume, and mean-time-to-detect tracking
+- **Log streaming** — syslog and webhook ingestion for near-real-time analysis
 
 ---
 
