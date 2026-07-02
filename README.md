@@ -276,7 +276,7 @@ npm run preview
 
 ![Input box](screenshots/input-box.png)
 
-![Windows logs](screenshots/window-logs.png)
+![Windows logs](screenshots/windows-logs.png)
 
 ![Linux logs](screenshots/linux-logs.png)
 
