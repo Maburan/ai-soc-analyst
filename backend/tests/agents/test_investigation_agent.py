@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 from agents.investigation_agent import InvestigationAgent
@@ -160,6 +162,12 @@ def test_investigation_report_requires_non_empty_evidence_and_recommendations():
         )
 
 
+@pytest.fixture(autouse=True)
+def _clear_gemini_key(monkeypatch):
+    """Prevent a locally-set GEMINI_API_KEY from influencing tests."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+
 def test_template_generator_uses_finding_metadata_in_evidence():
     finding = make_finding(
         finding_type=BRUTE_FORCE_ATTACK,
@@ -176,3 +184,25 @@ def test_template_generator_uses_finding_metadata_in_evidence():
         "Source IP: 192.168.1.10",
         "Finding severity: HIGH",
     ]
+
+
+def test_default_report_generator_is_template_when_key_missing(monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    agent = InvestigationAgent()
+    from agents.report_generators import TemplateReportGenerator
+
+    assert isinstance(agent.report_generator, TemplateReportGenerator)
+
+
+def test_default_report_generator_is_gemini_when_key_set(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    agent = InvestigationAgent()
+    from agents.report_generators import GeminiReportGenerator
+
+    assert isinstance(agent.report_generator, GeminiReportGenerator)
+
+
+def test_explicit_generator_takes_precedence_over_env_var(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    agent = InvestigationAgent(report_generator=TemplateReportGenerator())
+    assert isinstance(agent.report_generator, TemplateReportGenerator)

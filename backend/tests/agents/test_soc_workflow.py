@@ -3,6 +3,12 @@ from pathlib import Path
 
 import pytest
 
+
+@pytest.fixture(autouse=True)
+def _clear_gemini_key(monkeypatch):
+    """Prevent a locally-set GEMINI_API_KEY from influencing tests."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
 from agents.correlation_agent import CorrelationAgent
 from agents.graphs.nodes import (
     correlate_events,

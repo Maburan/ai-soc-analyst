@@ -1,6 +1,12 @@
 import pytest
 from fastapi.testclient import TestClient
 
+
+@pytest.fixture(autouse=True)
+def _clear_gemini_key(monkeypatch):
+    """Prevent a locally-set GEMINI_API_KEY from influencing tests."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
 from app.api.deps import get_analysis_service
 from app.main import create_app
 from app.services.analysis_service import AnalysisService
