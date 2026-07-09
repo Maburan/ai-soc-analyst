@@ -408,4 +408,4 @@ This project is provided for educational and demonstration purposes.
 
 ## 🌐 Live Demo
 
-[Demo link](https://ai-soc-analyst-9dgzmoteu-maburans-projects.vercel.app/)
+[Demo link](https://ai-soc-analyst-blond.vercel.app/)
