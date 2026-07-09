@@ -270,32 +270,6 @@ npm run preview
 
 ---
 
-## Screenshots
-
-### Upload Logs
-
-![Input box](screenshots/input-box.png)
-
-### Windows Logs
-
-![Windows logs](screenshots/windows-logs.png)
-
-### Linux Logs
-
-![Linux logs](screenshots/linux-logs.png)
-
-### CSV Logs
-
-![CSV logs](screenshots/csv-logs.png)
-
-### Analysis Results — Findings
-![Security Findings](screenshots/security-findings.png)
-
-### Analysis Results — Investigation Reports
-![Investigation Reports](screenshots/investigation-report.png)
-
----
-
 ## Sample Datasets
 
 The `data/samples/` directory contains labeled attack scenarios across all three supported formats. Each file documents its attack type, timeline, expected findings, and which detection rules should trigger.
