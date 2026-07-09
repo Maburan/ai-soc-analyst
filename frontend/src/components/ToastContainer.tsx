@@ -1,15 +1,16 @@
+import { X, CheckCircle, AlertCircle, Info } from "lucide-react";
 import { useToast, type ToastType } from "../context/ToastContext";
 
-const iconMap: Record<ToastType, string> = {
-  success: "\u2713",
-  error: "\u2715",
-  info: "\u2139",
+const iconMap: Record<ToastType, React.ReactNode> = {
+  success: <CheckCircle className="h-4 w-4 text-green-400" />,
+  error: <AlertCircle className="h-4 w-4 text-red-400" />,
+  info: <Info className="h-4 w-4 text-blue-400" />,
 };
 
 const styleMap: Record<ToastType, string> = {
-  success: "border-green-200 bg-green-50 text-green-800",
-  error: "border-red-200 bg-red-50 text-red-800",
-  info: "border-blue-200 bg-blue-50 text-blue-800",
+  success: "border-green-500/20 bg-green-500/10 text-green-400",
+  error: "border-red-500/20 bg-red-500/10 text-red-400",
+  info: "border-blue-500/20 bg-blue-500/10 text-blue-400",
 };
 
 export function ToastContainer() {
@@ -22,17 +23,17 @@ export function ToastContainer() {
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg animate-slide-in ${styleMap[toast.type]}`}
+          className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg slide-in ${styleMap[toast.type]}`}
           role="alert"
         >
-          <span className="text-base">{iconMap[toast.type]}</span>
+          {iconMap[toast.type]}
           <span className="flex-1">{toast.message}</span>
           <button
             onClick={() => removeToast(toast.id)}
             className="ml-2 text-current opacity-60 hover:opacity-100"
             aria-label="Dismiss"
           >
-            \u2715
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
       ))}

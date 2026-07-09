@@ -1,18 +1,43 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  useCallback,
+  type ReactNode,
+} from "react";
 import type { AnalyzeResponse } from "../types/api";
+import { findHistoryItem } from "../lib/persistence";
 
 interface AnalysisContextValue {
   analysisResult: AnalyzeResponse | null;
   setAnalysisResult: (result: AnalyzeResponse | null) => void;
   uploadedFileName: string | null;
   setUploadedFileName: (fileName: string | null) => void;
+  loadFromHistory: (id: string) => boolean;
 }
 
-const AnalysisContext = createContext<AnalysisContextValue | undefined>(undefined);
+const AnalysisContext = createContext<AnalysisContextValue | undefined>(
+  undefined,
+);
 
 export function AnalysisProvider({ children }: { children: ReactNode }) {
-  const [analysisResult, setAnalysisResult] = useState<AnalyzeResponse | null>(null);
-  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] =
+    useState<AnalyzeResponse | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(
+    null,
+  );
+
+  const loadFromHistory = useCallback(
+    (id: string): boolean => {
+      const item = findHistoryItem(id);
+      if (!item) return false;
+      setAnalysisResult(item.analysisResult);
+      setUploadedFileName(item.filename);
+      return true;
+    },
+    [],
+  );
 
   const value = useMemo(
     () => ({
@@ -20,8 +45,9 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
       setAnalysisResult,
       uploadedFileName,
       setUploadedFileName,
+      loadFromHistory,
     }),
-    [analysisResult, uploadedFileName],
+    [analysisResult, uploadedFileName, loadFromHistory],
   );
 
   return (

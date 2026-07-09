@@ -19,6 +19,13 @@ export interface AnalyzeResponse {
   investigation_reports: InvestigationReport[];
 }
 
+export interface AnalysisHistoryItem {
+  id: string;
+  filename: string;
+  analyzedAt: string;
+  analysisResult: AnalyzeResponse;
+}
+
 export interface ApiError {
   detail: string | { msg: string }[];
 }
