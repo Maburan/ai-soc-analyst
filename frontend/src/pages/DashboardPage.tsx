@@ -7,7 +7,7 @@ import {
   FileText,
   Upload,
   Shield,
-  Clock,
+  Activity,
 } from "lucide-react";
 import { useAnalysis } from "../context/AnalysisContext";
 import { useAnalysisHistory } from "../hooks/useAnalysisHistory";
@@ -15,7 +15,10 @@ import { aggregateMetrics } from "../lib/aggregation";
 import { StatCard } from "../components/dashboard/StatCard";
 import { TopSourceIPs } from "../components/dashboard/TopSourceIPs";
 import { AttackDistribution } from "../components/dashboard/AttackDistribution";
-import { RecentAnalyses } from "../components/dashboard/RecentAnalyses";
+import { ThreatScoreCard } from "../components/dashboard/ThreatScoreCard";
+import { AttackTrendsChart } from "../components/dashboard/AttackTrendsChart";
+import { TopTargetedUsers } from "../components/dashboard/TopTargetedUsers";
+import { RecentInvestigations } from "../components/dashboard/RecentInvestigations";
 import { QuickActions } from "../components/dashboard/QuickActions";
 import { SystemStatus } from "../components/dashboard/SystemStatus";
 import { Button } from "../components/ui/button";
@@ -40,7 +43,7 @@ export function DashboardPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">SOC Dashboard</h1>
@@ -52,7 +55,7 @@ export function DashboardPage() {
         </div>
         {hasHistory && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Clock className="h-3.5 w-3.5" />
+            <Activity className="h-3.5 w-3.5" />
             <span>
               {history.length} file{history.length !== 1 ? "s" : ""} analyzed
             </span>
@@ -91,53 +94,101 @@ export function DashboardPage() {
         </Card>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard
-              title="Files Analyzed"
-              value={metrics.filesAnalyzed}
-              icon={FileText}
-              iconClassName="text-emerald-500 bg-emerald-500/10"
-            />
-            <StatCard
-              title="Total Findings"
-              value={metrics.totalFindings}
-              icon={Bug}
-              iconClassName="text-blue-500 bg-blue-500/10"
-            />
-            <StatCard
-              title="Critical Incidents"
-              value={metrics.criticalFindings}
-              icon={AlertTriangle}
-              iconClassName="text-red-500 bg-red-500/10"
-            />
-            <StatCard
-              title="High Severity Alerts"
-              value={metrics.highFindings}
-              icon={ShieldAlert}
-              iconClassName="text-orange-500 bg-orange-500/10"
-            />
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-5">
-            <div className="lg:col-span-3">
-              <AttackDistribution data={metrics.attackDistribution} />
-            </div>
-            <div className="lg:col-span-2">
-              <TopSourceIPs data={metrics.topIps} />
-            </div>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-5">
-            <div className="lg:col-span-3">
-              <RecentAnalyses
-                items={history}
-                onSelect={handleOpenAnalysis}
+          {}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60 mb-3">
+              Threat Overview
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <StatCard
+                title="Files Analyzed"
+                value={metrics.filesAnalyzed}
+                icon={FileText}
+                iconClassName="text-emerald-500 bg-emerald-500/10"
+              />
+              <StatCard
+                title="Total Findings"
+                value={metrics.totalFindings}
+                icon={Bug}
+                iconClassName="text-blue-500 bg-blue-500/10"
+              />
+              <StatCard
+                title="Critical"
+                value={metrics.criticalFindings}
+                icon={AlertTriangle}
+                iconClassName="text-red-500 bg-red-500/10"
+                description={
+                  metrics.totalFindings > 0
+                    ? `${((metrics.criticalFindings / metrics.totalFindings) * 100).toFixed(1)}% of total`
+                    : undefined
+                }
+              />
+              <StatCard
+                title="High"
+                value={metrics.highFindings}
+                icon={ShieldAlert}
+                iconClassName="text-orange-500 bg-orange-500/10"
+                description={
+                  metrics.totalFindings > 0
+                    ? `${((metrics.highFindings / metrics.totalFindings) * 100).toFixed(1)}% of total`
+                    : undefined
+                }
+              />
+              <StatCard
+                title="Medium / Low"
+                value={metrics.mediumFindings + metrics.lowFindings}
+                icon={Activity}
+                iconClassName="text-yellow-500 bg-yellow-500/10"
+                description={
+                  metrics.totalFindings > 0
+                    ? `${((metrics.mediumFindings + metrics.lowFindings) / metrics.totalFindings * 100).toFixed(1)}% of total`
+                    : undefined
+                }
               />
             </div>
-            <div className="lg:col-span-2">
-              <QuickActions hasAnalysis={hasHistory} />
+          </div>
+
+          {}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60 mb-3">
+              Analytics
+            </p>
+            <div className="grid gap-4 lg:grid-cols-5">
+              <div className="lg:col-span-1">
+                <ThreatScoreCard score={metrics.threatScore} />
+              </div>
+              <div className="lg:col-span-2">
+                <AttackTrendsChart data={metrics.attackTrends} />
+              </div>
+              <div className="lg:col-span-2">
+                <AttackDistribution data={metrics.attackDistribution} />
+              </div>
             </div>
           </div>
+
+          {}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60 mb-3">
+              Intelligence
+            </p>
+            <div className="grid gap-4 lg:grid-cols-5">
+              <div className="lg:col-span-2">
+                <TopSourceIPs data={metrics.topIps} />
+              </div>
+              <div className="lg:col-span-2">
+                <TopTargetedUsers data={metrics.topUsers} />
+              </div>
+              <div className="lg:col-span-1">
+                <QuickActions hasAnalysis={hasHistory} />
+              </div>
+            </div>
+          </div>
+
+          {}
+          <RecentInvestigations
+            items={history}
+            onSelect={handleOpenAnalysis}
+          />
         </>
       )}
     </div>
