@@ -6,6 +6,7 @@ import { Card, CardContent } from "../components/ui/card";
 import { IncidentExplorer } from "../components/workspace/IncidentExplorer";
 import { IncidentDetail } from "../components/workspace/IncidentDetail";
 import { CopilotPlaceholder } from "../components/workspace/CopilotPlaceholder";
+import { AnalysisSummaryCard } from "../components/AnalysisSummaryCard";
 import { useAnalysis } from "../context/AnalysisContext";
 
 export function WorkspacePage() {
@@ -16,14 +17,16 @@ export function WorkspacePage() {
     return <Navigate to="/" replace />;
   }
 
-  const { findings, investigation_reports } = analysisResult;
-  const safeIndex = Math.min(selectedIndex, findings.length - 1);
-  const currentFinding = findings[safeIndex];
-  const currentReport = investigation_reports[safeIndex];
+  const { findings, investigation_reports, metadata } = analysisResult;
+  const hasFindings = findings.length > 0;
+  const safeIndex = hasFindings
+    ? Math.min(selectedIndex, findings.length - 1)
+    : 0;
+  const currentFinding = hasFindings ? findings[safeIndex] : null;
+  const currentReport = hasFindings ? investigation_reports[safeIndex] : null;
 
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col gap-4">
-      {}
       <div className="flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
@@ -38,7 +41,9 @@ export function WorkspacePage() {
             <p className="text-xs text-muted-foreground">
               {uploadedFileName ?? "Analysis results"}
               <span className="mx-1.5">&middot;</span>
-              {findings.length} incident{findings.length !== 1 ? "s" : ""}
+              {hasFindings
+                ? `${findings.length} incident${findings.length !== 1 ? "s" : ""} detected`
+                : "No incidents detected"}
             </p>
           </div>
         </div>
@@ -50,42 +55,54 @@ export function WorkspacePage() {
         </Button>
       </div>
 
-      {}
-      <div className="flex-1 grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr_280px] min-h-0">
-        {}
-        <div className="overflow-hidden rounded-lg">
-          <IncidentExplorer
-            findings={findings}
-            selectedIndex={safeIndex}
-            onSelect={setSelectedIndex}
-          />
-        </div>
+      <AnalysisSummaryCard metadata={metadata} />
 
-        {}
-        <div className="overflow-y-auto rounded-lg">
-          {currentFinding && currentReport ? (
-            <IncidentDetail
-              finding={currentFinding}
-              report={currentReport}
-              index={safeIndex}
+      {hasFindings ? (
+        <div className="flex-1 grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr_280px] min-h-0">
+          <div className="overflow-hidden rounded-lg">
+            <IncidentExplorer
+              findings={findings}
+              selectedIndex={safeIndex}
+              onSelect={setSelectedIndex}
             />
-          ) : (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                <FileText className="h-8 w-8 text-muted-foreground/50" />
-                <p className="mt-3 text-sm text-muted-foreground">
-                  Select an incident from the explorer to view details.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+          </div>
 
-        {}
-        <div className="overflow-hidden rounded-lg">
-          <CopilotPlaceholder />
+          <div className="overflow-y-auto rounded-lg">
+            {currentFinding && currentReport ? (
+              <IncidentDetail
+                finding={currentFinding}
+                report={currentReport}
+                index={safeIndex}
+              />
+            ) : (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+                  <FileText className="h-8 w-8 text-muted-foreground/50" />
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    Select an incident from the explorer to view details.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          <div className="overflow-hidden rounded-lg">
+            <CopilotPlaceholder />
+          </div>
         </div>
-      </div>
+      ) : (
+        <Card className="flex-1 border-dashed">
+          <CardContent className="flex flex-col items-center justify-center h-full min-h-[200px] text-center">
+            <FileText className="h-10 w-10 text-muted-foreground/30" />
+            <p className="mt-4 text-sm text-muted-foreground">
+              No security findings were generated for this file.
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground/60">
+              Try analyzing a different log file with known attack patterns.
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

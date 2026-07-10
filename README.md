@@ -490,3 +490,6 @@ MIT License. See [LICENSE](LICENSE) for details.
 ## Demo
 
 https://ai-soc-analyst-blond.vercel.app/
+
+Use the sample files given here to test it out:
+[ai-soc-analyst\data\samples](data/samples)

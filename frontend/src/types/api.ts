@@ -14,9 +14,19 @@ export interface InvestigationReport {
   recommendations: string[];
 }
 
+export interface AnalysisMetadata {
+  detected_log_format: string;
+  events_parsed: number;
+  events_correlated: number;
+  rules_executed: number;
+  findings_generated: number;
+  analysis_duration_ms: number;
+}
+
 export interface AnalyzeResponse {
   findings: SecurityFinding[];
   investigation_reports: InvestigationReport[];
+  metadata: AnalysisMetadata;
 }
 
 export interface AnalysisHistoryItem {

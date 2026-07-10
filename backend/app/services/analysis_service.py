@@ -2,7 +2,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 from agents.graphs.runner import SOCWorkflowRunner
-from app.schemas.analyze import AnalyzeResponse
+from app.schemas.analyze import AnalysisMetadata, AnalyzeResponse
 
 
 class AnalysisValidationError(ValueError):
@@ -26,9 +26,19 @@ class AnalysisService:
         finally:
             Path(temp_path).unlink(missing_ok=True)
 
+        metadata = AnalysisMetadata(
+            detected_log_format=result.get("detected_log_format", "unknown"),
+            events_parsed=result.get("events_parsed", 0),
+            events_correlated=result.get("events_correlated", 0),
+            rules_executed=result.get("rules_executed", 0),
+            findings_generated=result.get("findings_generated", 0),
+            analysis_duration_ms=result.get("analysis_duration_ms", 0),
+        )
+
         return AnalyzeResponse(
             findings=result.get("security_findings", []),
             investigation_reports=result.get("investigation_reports", []),
+            metadata=metadata,
         )
 
     def _validate_upload(self, filename: str, file_content: bytes) -> None:
